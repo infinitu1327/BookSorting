@@ -69,6 +69,7 @@ namespace BookSorting
         {
             var directories = Directory.GetDirectories(path);
             var files = Directory.GetFiles(path);
+
             if (directories.Length == 0 && files.Length == 0)
                 Directory.Delete(path);
             else
@@ -83,29 +84,29 @@ namespace BookSorting
             foreach (var file in files)
                 try
                 {
-                    if (new FileInfo(file).Extension==".zip")
+                    switch (new FileInfo(file).Extension)
                     {
-                        using (var archive = ZipFile.OpenRead(file))
-                        {
-                            books.AddRange(archive.Entries
-                                .Where(entry => new FileInfo(entry.FullName).Extension == ".fb2")
-                                .Select(zipArchiveEntry =>
-                                    new Book
-                                    {
-                                        Author = GetAuthorAsync(zipArchiveEntry.Open()).Result,
-                                        File = new FileInfo(file)
-                                    }
-                                ));
-                        }
-                    }
-                    else
-                    {
-                        if (new FileInfo(file).Extension == ".fb2")
+                        case ".zip":
+                            using (var archive = ZipFile.OpenRead(file))
+                            {
+                                books.AddRange(archive.Entries
+                                    .Where(entry => new FileInfo(entry.FullName).Extension == ".fb2")
+                                    .Select(zipArchiveEntry =>
+                                        new Book
+                                        {
+                                            Author = GetAuthorAsync(zipArchiveEntry.Open()).Result,
+                                            File = new FileInfo(file)
+                                        }
+                                    ));
+                            }
+                            break;
+                        case ".fb2":
                             books.Add(new Book
                             {
                                 Author = GetAuthorAsync(File.OpenRead(file)).Result,
                                 File = new FileInfo(file)
                             });
+                            break;
                     }
                 }
                 catch (Exception)
@@ -120,6 +121,7 @@ namespace BookSorting
         {
             var book = await new FB2Reader().ReadAsync(stream, new XmlLoadSettings(new XmlReaderSettings()));
             var author = book.TitleInfo.BookAuthors.ToList()[0];
+
             return $"{author?.FirstName} {author?.MiddleName} {author?.LastName}".Replace("  ", " ");
         }
 
@@ -147,10 +149,7 @@ namespace BookSorting
 
         private static string GetDirectory(IEnumerable<string> directories, string name)
         {
-            foreach (var directory in directories)
-                if (directory.Contains(name)) return directory;
-
-            return null;
+            return directories.FirstOrDefault(directory => directory.Contains(name));
         }
     }
 }
