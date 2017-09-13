@@ -10,62 +10,75 @@ using FB2Library;
 
 namespace BookSorting
 {
-    public class Book
-    {
-        public FileInfo File { get; set; }
-        public string Author { get; set; }
-    }
-
-    internal class Program
+    internal static class Program
     {
         private static void Main(string[] args)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            var files = GetFiles(Directory.GetCurrentDirectory());
-            var directories = GetDirectories().ToList();
-
-            Console.Write("Получаем список книг...");
-
-            var books = GetBooks(files);
-
-            Console.WriteLine($"\r Список книг получен. Всего книг:{books.Count}");
             Console.WriteLine("Начинаем сортировку...");
-
-            foreach (var book in books)
-            {
-                var directory = GetDirectory(directories, book.Author);
-                var filename = book.File.Name;
-
-                try
-                {
-                    if (directory == null)
-                    {
-                        var newDirectory =
-                            Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), book.Author));
-                        directories.Add(newDirectory.FullName);
-                        File.Move(book.File.FullName, Path.Combine(newDirectory.FullName, filename));
-                    }
-                    else
-                    {
-                        if (directory != book.File.DirectoryName && !File.Exists(Path.Combine(directory, filename)))
-                            File.Move(book.File.FullName, Path.Combine(directory, filename));
-                    }
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine($"{book.File.Name} ignored");
-                }
-            }
-
-            Console.WriteLine("Сортировка выполнена!");
-
+            Sort().Wait();
             Console.WriteLine("Подчищаем пустые папки...");
-            Clear(Directory.GetCurrentDirectory());
+            DeleteEmptyFolders(Directory.GetCurrentDirectory());
             Console.WriteLine("Готово!");
         }
 
-        private static void Clear(string path)
+        private static async Task Sort()
+        {
+            var files = GetFiles();
+
+            foreach (var file in files)
+                switch (file.Extension)
+                {
+                    case ".fb2":
+                        await ProcessFile(ProcessFb2, file);
+                        break;
+
+                    case ".zip":
+                        await ProcessFile(ProcessFb2FromArchive, file);
+                        break;
+                }
+        }
+
+        private static async Task LogError(string info)
+        {
+            await File.AppendAllTextAsync(Path.Combine(Directory.GetCurrentDirectory(), "log.txt"), info);
+        }
+
+        private static async Task ProcessFb2(FileInfo file)
+        {
+            var author = await GetAuthorAsync(File.OpenRead(file.FullName));
+            file.MoveTo(Path.Combine(GetAuthorDirectory(author), file.Name));
+        }
+
+        private static async Task ProcessFb2FromArchive(FileInfo file)
+        {
+            var archive = ZipFile.OpenRead(file.FullName);
+            var fb2File = archive
+                .Entries
+                .FirstOrDefault(entry =>
+                    new FileInfo(entry.FullName).Extension == ".fb2" ||
+                    new FileInfo(entry.FullName).Extension == ".fbd");
+
+            if (fb2File == null) return;
+            var author = await GetAuthorAsync(fb2File.Open());
+            archive.Dispose();
+            file.MoveTo(Path.Combine(GetAuthorDirectory(author), file.Name));
+        }
+
+        private static async Task ProcessFile(ProcessFileCallback function, FileInfo file)
+        {
+            try
+            {
+                await function.Invoke(file);
+            }
+            catch (Exception)
+            {
+                await LogError($"Ошибка с {file} {Environment.NewLine}");
+            }
+        }
+
+        private static void DeleteEmptyFolders(string path)
         {
             var directories = Directory.GetDirectories(path);
             var files = Directory.GetFiles(path);
@@ -74,82 +87,33 @@ namespace BookSorting
                 Directory.Delete(path);
             else
                 foreach (var directory in directories)
-                    Clear(directory);
-        }
-
-        private static List<Book> GetBooks(IEnumerable<string> files)
-        {
-            var books = new List<Book>();
-
-            foreach (var file in files)
-                try
-                {
-                    switch (new FileInfo(file).Extension)
-                    {
-                        case ".zip":
-                            using (var archive = ZipFile.OpenRead(file))
-                            {
-                                books.AddRange(archive.Entries
-                                    .Where(entry => new FileInfo(entry.FullName).Extension == ".fb2")
-                                    .Select(zipArchiveEntry =>
-                                        new Book
-                                        {
-                                            Author = GetAuthorAsync(zipArchiveEntry.Open()).Result,
-                                            File = new FileInfo(file)
-                                        }
-                                    ));
-                            }
-                            break;
-                        case ".fb2":
-                            books.Add(new Book
-                            {
-                                Author = GetAuthorAsync(File.OpenRead(file)).Result,
-                                File = new FileInfo(file)
-                            });
-                            break;
-                    }
-                }
-                catch (Exception)
-                {
-                    books.Add(new Book {Author = "Error Error", File = new FileInfo(file)});
-                }
-
-            return books;
+                    DeleteEmptyFolders(directory);
         }
 
         private static async Task<string> GetAuthorAsync(Stream stream)
         {
             var book = await new FB2Reader().ReadAsync(stream, new XmlLoadSettings(new XmlReaderSettings()));
-            var author = book.TitleInfo.BookAuthors.ToList()[0];
+            var author = book.TitleInfo.BookAuthors.ElementAt(0);
+            stream.Dispose();
 
-            return $"{author?.FirstName} {author?.MiddleName} {author?.LastName}".Replace("  ", " ");
+            return $"{author?.FirstName} {author?.MiddleName} {author?.LastName}".Replace("  ", " ").Trim();
         }
 
-        private static IEnumerable<string> GetFiles(string path)
+        private static IEnumerable<FileInfo> GetFiles()
         {
-            var files = new List<string>();
-            var directories = Directory.GetDirectories(path);
-
-            foreach (var directory in directories)
-            {
-                var directoryInfo = new DirectoryInfo(directory);
-
-                if (directoryInfo.Attributes != FileAttributes.Hidden)
-                    files.AddRange(GetFiles(directory));
-            }
-
-            files.AddRange(Directory.GetFiles(path));
-            return files;
+            return new DirectoryInfo(Directory.GetCurrentDirectory())
+                .EnumerateFiles();
         }
 
-        private static IEnumerable<string> GetDirectories()
+        private static string GetAuthorDirectory(string author)
         {
-            return Directory.GetDirectories(Directory.GetCurrentDirectory());
+            var authorDirectory = Directory
+                .EnumerateDirectories(Directory.GetCurrentDirectory())
+                .FirstOrDefault(directory => directory.Contains(author));
+
+            return authorDirectory ?? Directory.CreateDirectory(author).FullName;
         }
 
-        private static string GetDirectory(IEnumerable<string> directories, string name)
-        {
-            return directories.FirstOrDefault(directory => directory.Contains(name));
-        }
+        private delegate Task ProcessFileCallback(FileInfo file);
     }
 }
