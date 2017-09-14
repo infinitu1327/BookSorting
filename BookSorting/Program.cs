@@ -66,11 +66,11 @@ namespace BookSorting
             file.MoveTo(Path.Combine(GetAuthorDirectory(author), file.Name));
         }
 
-        private static async Task ProcessFile(ProcessFileCallback function, FileInfo file)
+        private static async Task ProcessFile(Func<FileInfo,Task> action, FileInfo file)
         {
             try
             {
-                await function.Invoke(file);
+                await action.Invoke(file);
             }
             catch (Exception)
             {
@@ -113,7 +113,5 @@ namespace BookSorting
 
             return authorDirectory ?? Directory.CreateDirectory(author).FullName;
         }
-
-        private delegate Task ProcessFileCallback(FileInfo file);
     }
 }
