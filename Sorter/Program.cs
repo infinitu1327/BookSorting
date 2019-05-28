@@ -30,7 +30,6 @@ namespace Sorter
                 .EnumerateFiles("*.zip");
 
             foreach (var file in files)
-            {
                 try
                 {
                     string authorDirectory;
@@ -53,7 +52,6 @@ namespace Sorter
                     Console.WriteLine($"Error with {file.Name}:");
                     Console.WriteLine(e.Message);
                 }
-            }
         }
 
         private static string GetAuthorDirectory(Stream fileStream)

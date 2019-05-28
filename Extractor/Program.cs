@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 
 namespace Extractor
 {
@@ -15,10 +16,8 @@ namespace Extractor
         {
             var directory = new DirectoryInfo(path);
 
-            foreach (var file in directory.EnumerateFiles())
-            {
-                if (file.Extension != ".fb2" && file.Extension != ".zip") continue;
-                
+            foreach (var file in directory.EnumerateFiles()
+                .Where(file => file.Extension == ".fb2" || file.Extension == ".zip"))
                 try
                 {
                     file.MoveTo(Path.Combine(Directory.GetCurrentDirectory(), file.Name));
@@ -28,14 +27,10 @@ namespace Extractor
                     Console.WriteLine(e);
                     Console.WriteLine(file.Name);
                 }
-            }
 
-            foreach (var dir in directory.EnumerateDirectories())
-            {
-                ExtractFilesFromDirectory(dir.FullName);
-            }
+            foreach (var dir in directory.EnumerateDirectories()) ExtractFilesFromDirectory(dir.FullName);
         }
-        
+
         private static void DeleteEmptyFolders(string path)
         {
             var directories = Directory.GetDirectories(path);

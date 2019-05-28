@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 
 namespace Archivator
 {
@@ -10,10 +11,7 @@ namespace Archivator
         {
             var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
 
-            foreach (var file in directory.EnumerateFiles())
-            {
-                if (file.Extension != ".fb2") continue;
-                
+            foreach (var file in directory.EnumerateFiles().Where(file => file.Extension == ".fb2"))
                 try
                 {
                     using var fileStream = File.Create(Path.Combine(directory.FullName, $"{file.Name}.zip"));
@@ -26,7 +24,6 @@ namespace Archivator
                     Console.WriteLine(e);
                     Console.WriteLine(file.Name);
                 }
-            }
         }
     }
 }
