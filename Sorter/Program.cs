@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Xml;
 
-namespace BooksSorter
+namespace Sorter
 {
     internal static class Program
     {
@@ -46,8 +46,7 @@ namespace BooksSorter
                         authorDirectory = GetAuthorDirectory(fb2File.Open());
                     }
 
-                    if (authorDirectory != null)
-                        file.MoveTo(Path.Combine(authorDirectory, file.Name));
+                    file.MoveTo(Path.Combine(authorDirectory, file.Name));
                 }
                 catch (Exception e)
                 {

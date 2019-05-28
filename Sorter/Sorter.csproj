@@ -2,12 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
-    <AssemblyName>BS</AssemblyName>
-    <RootNamespace>BooksSorter</RootNamespace>
+    <AssemblyName>Sorter</AssemblyName>
+    <RootNamespace>Sorter</RootNamespace>
     <ApplicationIcon />
     <OutputType>Exe</OutputType>
     <StartupObject />
     <LangVersion>8</LangVersion>
+    <NullableContextOptions>enable</NullableContextOptions>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
